@@ -431,7 +431,7 @@ function renderHistory() {
   if (history.length === 0) { card.style.display = 'none'; return; }
   card.style.display = 'block';
   list.innerHTML = history.map(m =>
-    '<div class="history-item" onclick="showMovieByTitle('' + m.t.replace(/'/g, "\'") + '')">' +
+    '<div class="history-item" onclick="showMovieByTitle(\'' + m.t.replace(/'/g, "\\'") + '\')">' +
       '<div class="history-item-title">' + m.t + '</div>' +
       '<div class="history-item-year">' + m.y + ' · ★' + m.r + '</div>' +
     '</div>'
@@ -445,12 +445,8 @@ function showMovieByTitle(title) {
 
 function showAllMovies() {
   const pool = getFilteredMovies();
-  const list = pool.map((m, i) => (i+1) + '. ' + m.t + ' (' + m.y + ') ★' + m.r + ' [' + m.s.join('+') + ']').join('
-');
-  alert('当前筛选：' + (currentFilter === 'all' ? '全部' : currentFilter) + '
-共 ' + pool.length + ' 部影片
-
-' + list.substring(0, 2000) + (list.length > 2000 ? '...' : ''));
+  const list = pool.map((m, i) => (i+1) + '. ' + m.t + ' (' + m.y + ') ★' + m.r + ' [' + m.s.join('+') + ']').join('\n');
+  alert('当前筛选：' + (currentFilter === 'all' ? '全部' : currentFilter) + '\n共 ' + pool.length + ' 部影片\n\n' + list.substring(0, 2000) + (list.length > 2000 ? '...' : ''));
 }
 
 updateStats();
