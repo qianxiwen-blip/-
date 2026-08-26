@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>每日电影 - 随机抽取</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+  min-height: 100vh; color: #fff; padding: 20px;
+}
+.container { max-width: 640px; margin: 0 auto; }
+.card {
+  background: rgba(255,255,255,0.06); backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px); border-radius: 24px;
+  padding: 32px; margin-bottom: 20px;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+}
+.title {
+  font-size: 32px; font-weight: 800; text-align: center;
+  background: linear-gradient(90deg, #ff6b6b, #feca57);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  margin-bottom: 6px; letter-spacing: 2px;
+}
+.subtitle { text-align: center; color: #a0a0b0; font-size: 14px; margin-bottom: 28px; }
+.filter-bar { display: flex; gap: 10px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 4px; }
+.filter-btn {
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+  color: #a0a0b0; padding: 8px 18px; border-radius: 24px;
+  font-size: 13px; cursor: pointer; white-space: nowrap; transition: all .25s;
+  font-family: inherit;
+}
+.filter-btn:hover { background: rgba(255,255,255,0.1); }
+.filter-btn.active {
+  background: linear-gradient(90deg, rgba(255,107,107,0.25), rgba(254,202,87,0.25));
+  color: #feca57; border-color: rgba(254,202,87,0.4); font-weight: 600;
+}
+.movie-display {
+  background: rgba(0,0,0,0.25); border-radius: 20px; padding: 36px 24px;
+  text-align: center; min-height: 260px;
+  display: flex; flex-direction: column; justify-content: center;
+  position: relative; overflow: hidden; border: 1px solid rgba(255,255,255,0.05);
+}
+.empty-state { color: #8892b0; font-size: 16px; }
+.empty-state .icon { font-size: 56px; margin-bottom: 16px; display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+.movie-title { font-size: 28px; font-weight: 700; color: #fff; margin-bottom: 8px; line-height: 1.3; }
+.movie-original { font-size: 14px; color: #8892b0; margin-bottom: 14px; font-style: italic; }
+.movie-meta { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.meta-tag {
+  background: rgba(255,255,255,0.08); color: #ccd6f6;
+  padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+}
+.meta-tag.source-imdb { background: rgba(245,197,24,0.12); color: #f5c518; }
+.meta-tag.source-douban { background: rgba(0,180,0,0.12); color: #00e676; }
+.meta-tag.source-both { background: linear-gradient(90deg, rgba(245,197,24,0.15), rgba(0,180,0,0.15)); color: #ffd700; }
+.genre-cloud { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 10px; }
+.genre-tag { background: rgba(255,255,255,0.05); color: #a0a0b0; padding: 3px 10px; border-radius: 12px; font-size: 11px; }
+.rating { font-size: 36px; font-weight: 800; color: #feca57; margin: 6px 0 10px; }
+.movie-desc { color: #ccd6f6; font-size: 14px; line-height: 1.7; max-width: 520px; margin: 0 auto; }
+.director { margin-top: 14px; font-size: 12px; color: #8892b0; }
+.btn {
+  width: 100%; padding: 18px; border: none; border-radius: 16px;
+  font-size: 18px; font-weight: 700; cursor: pointer; transition: all .3s;
+  margin-top: 18px; font-family: inherit;
+}
+.btn-primary { background: linear-gradient(90deg, #ff6b6b, #feca57); color: #1a1a2e; }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(255,107,107,0.35); }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.btn-secondary { background: rgba(255,255,255,0.06); color: #ccd6f6; margin-top: 12px; font-size: 14px; padding: 12px; border: 1px solid rgba(255,255,255,0.08); }
+.btn-secondary:hover { background: rgba(255,255,255,0.1); }
+.stats { display: flex; justify-content: space-around; text-align: center; }
+.stat-num { font-size: 26px; font-weight: 800; color: #feca57; }
+.stat-label { font-size: 12px; color: #8892b0; margin-top: 4px; }
+.history { margin-top: 4px; }
+.history-title { font-size: 16px; font-weight: 600; margin-bottom: 14px; color: #ccd6f6; }
+.history-list { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; }
+.history-item {
+  background: rgba(255,255,255,0.04); border-radius: 12px;
+  padding: 10px 14px; min-width: 130px; text-align: center;
+  cursor: pointer; border: 1px solid rgba(255,255,255,0.05);
+  transition: all .2s; flex-shrink: 0;
+}
+.history-item:hover { background: rgba(255,107,107,0.12); border-color: rgba(255,107,107,0.25); }
+.history-item-title { font-size: 13px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.history-item-year { font-size: 11px; color: #8892b0; margin-top: 4px; }
+.footer { text-align: center; color: #555; font-size: 12px; margin-top: 20px; }
+@media (max-width: 480px) {
+  .card { padding: 22px; }
+  .title { font-size: 26px; }
+  .movie-title { font-size: 22px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <div class="title">每日电影</div>
+    <div class="subtitle">IMDb Top 250 × 豆瓣 Top 250 合并精选库</div>
+    <div class="filter-bar" id="filters">
+      <button class="filter-btn active" onclick="setFilter('all',this)">全部</button>
+      <button class="filter-btn" onclick="setFilter('IMDb',this)">仅 IMDb</button>
+      <button class="filter-btn" onclick="setFilter('豆瓣',this)">仅 豆瓣</button>
+      <button class="filter-btn" onclick="setFilter('both',this)">双榜重合</button>
+    </div>
+    <div class="movie-display" id="display">
+      <div class="empty-state"><span class="icon">🎬</span><div>点击下方按钮，随机抽取今日电影</div></div>
+    </div>
+    <button class="btn btn-primary" id="drawBtn" onclick="drawMovie()">🎲 随机抽取一部电影</button>
+    <button class="btn btn-secondary" onclick="showAllMovies()">📋 查看完整片单</button>
+  </div>
+  <div class="card stats">
+    <div><div class="stat-num" id="totalCount">0</div><div class="stat-label">收录影片</div></div>
+    <div><div class="stat-num" id="imdbCount">0</div><div class="stat-label">IMDb 榜单</div></div>
+    <div><div class="stat-num" id="doubanCount">0</div><div class="stat-label">豆瓣榜单</div></div>
+    <div><div class="stat-num" id="bothCount">0</div><div class="stat-label">双榜重合</div></div>
+  </div>
+  <div class="card history" id="historyCard" style="display:none;">
+    <div class="history-title">📜 抽取记录</div>
+    <div class="history-list" id="historyList"></div>
+  </div>
+  <div class="footer">数据来源：IMDb Top 250 & 豆瓣电影 Top 250 · 合并去重精选</div>
+</div>
+
+<script>
+const movies = [
+  {t:"肖申克的救赎",o:"The Shawshank Redemption",y:1994,r:9.3,s:["IMDb","豆瓣"],g:"剧情/犯罪",c:"美国",d:"弗兰克·德拉邦特",desc:"一场关于希望与自由的伟大越狱。"},
+  {t:"教父",o:"The Godfather",y:1972,r:9.2,s:["IMDb","豆瓣"],g:"剧情/犯罪",c:"美国",d:"弗朗西斯·福特·科波拉",desc:"柯里昂家族的权力传承与命运悲歌。"},
+  {t:"教父2",o:"The Godfather Part II",y:1974,r:9.0,s:["IMDb","豆瓣"],g:"剧情/犯罪",c:"美国",d:"弗朗西斯·福特·科波拉",desc:"双线叙事下的家族兴衰与权力腐蚀。"},
+  {t:"蝙蝠侠：黑暗骑士",o:"The Dark Knight",y:2008,r:9.1,s:["IMDb","豆瓣"],g:"动作/犯罪",c:"美国",d:"克里斯托弗·诺兰",desc:"小丑与蝙蝠侠关于混沌与秩序的终极对决。"},
+  {t:"十二怒汉",o:"12 Angry Men",y:1957,r:9.0,s:["IMDb","豆瓣"],g:"剧情",c:"美国",d:"西德尼·吕美特",desc:"一间陪审室里关于偏见与理性的激烈辩论。"},
+  {t:"辛德勒的名单",o:"Schindler's List",y:1993,r:9.0,s:["IMDb","豆瓣"],g:"剧情/历史",c:"美国",d:"史蒂文·斯皮尔伯格",desc:"二战中一个德国商人拯救千余名犹太人的真实故事。"},
+  {t:"指环王3：王者无敌",o:"The Return of the King",y:2003,r:9.0,s:["IMDb","豆瓣"],g:"动作/冒险",c:"美国",d:"彼得·杰克逊",desc:"中土世界的最终决战与王者归来。"},
+  {t:"指环王1：护戒使者",o:"The Fellowship of the Ring",y:2001,r:8.9,s:["IMDb","豆瓣"],g:"动作/冒险",c:"美国",d:"彼得·杰克逊",desc:"九人护戒小队踏上毁灭魔戒的史诗征程。"},
+  {t:"低俗小说",o:"Pulp Fiction",y:1994,r:8.8,s:["IMDb","豆瓣"],g:"剧情/犯罪",c:"美国",d:"昆汀·塔伦蒂诺",desc:"非线性叙事下的洛杉矶黑帮众生相。"},
+  {t:"黄金三镖客",o:"The Good, the Bad and the Ugly",y:1966,r:8.8,s:["IMDb","豆瓣"],g:"西部",c:"意大利",d:"赛尔乔·莱昂内",desc:"南北战争背景下的三方寻宝对决。"},
+  {t:"搏击俱乐部",o:"Fight Club",y:1999,r:8.8,s:["IMDb","豆瓣"],g:"剧情/悬疑",c:"美国",d:"大卫·芬奇",desc:"一个失眠症患者与神秘肥皂商的地下反抗。"},
+  {t:"阿甘正传",o:"Forrest Gump",y:1994,r:8.8,s:["IMDb","豆瓣"],g:"剧情/爱情",c:"美国",d:"罗伯特·泽米吉斯",desc:"一个智商只有75的男人穿越美国现代史。"},
+  {t:"盗梦空间",o:"Inception",y:2010,r:8.8,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"克里斯托弗·诺兰",desc:"在他人梦境中植入想法的惊险任务。"},
+  {t:"指环王2：双塔奇兵",o:"The Two Towers",y:2002,r:8.8,s:["IMDb","豆瓣"],g:"动作/冒险",c:"美国",d:"彼得·杰克逊",desc:"中土联军在圣盔谷的悲壮保卫战。"},
+  {t:"星球大战2：帝国反击战",o:"The Empire Strikes Back",y:1980,r:8.7,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"厄文·克什纳",desc:"卢克与维达父子的命运对决。"},
+  {t:"黑客帝国",o:"The Matrix",y:1999,r:8.7,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"沃卓斯基姐妹",desc:"红药丸还是蓝药丸？觉醒于虚拟世界。"},
+  {t:"好家伙",o:"Goodfellas",y:1990,r:8.7,s:["IMDb","豆瓣"],g:"传记/犯罪",c:"美国",d:"马丁·斯科塞斯",desc:"黑帮分子三十年的沉浮与背叛。"},
+  {t:"飞越疯人院",o:"One Flew Over the Cuckoo's Nest",y:1975,r:8.7,s:["IMDb","豆瓣"],g:"剧情",c:"美国",d:"米洛斯·福尔曼",desc:"一个流浪汉挑战精神病院体制的悲剧。"},
+  {t:"七武士",o:"Seven Samurai",y:1954,r:8.6,s:["IMDb","豆瓣"],g:"动作/冒险",c:"日本",d:"黑泽明",desc:"武士与农民联手抵御山贼的史诗之战。"},
+  {t:"七宗罪",o:"Se7en",y:1995,r:8.6,s:["IMDb","豆瓣"],g:"犯罪/悬疑",c:"美国",d:"大卫·芬奇",desc:"以天主教七宗罪为蓝本的连环杀人案。"},
+  {t:"上帝之城",o:"City of God",y:2002,r:8.6,s:["IMDb","豆瓣"],g:"犯罪/剧情",c:"巴西",d:"费尔南多·梅里尔斯",desc:"里约贫民窟三十年的暴力与生存。"},
+  {t:"沉默的羔羊",o:"The Silence of the Lambs",y:1991,r:8.6,s:["IMDb","豆瓣"],g:"犯罪/惊悚",c:"美国",d:"乔纳森·戴米",desc:"实习探员与食人魔博士的致命合作。"},
+  {t:"美丽人生",o:"Life Is Beautiful",y:1997,r:8.6,s:["IMDb","豆瓣"],g:"剧情/喜剧",c:"意大利",d:"罗伯托·贝尼尼",desc:"父亲用谎言为儿子构筑的集中营童话。"},
+  {t:"生活多美好",o:"It's a Wonderful Life",y:1946,r:8.6,s:["IMDb","豆瓣"],g:"剧情/家庭",c:"美国",d:"弗兰克·卡普拉",desc:"天使下凡让失意者看见自己存在的价值。"},
+  {t:"星球大战",o:"Star Wars",y:1977,r:8.6,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"乔治·卢卡斯",desc:"太空歌剧的开山之作，原力觉醒。"},
+  {t:"拯救大兵瑞恩",o:"Saving Private Ryan",y:1998,r:8.6,s:["IMDb","豆瓣"],g:"剧情/战争",c:"美国",d:"史蒂文·斯皮尔伯格",desc:"诺曼底登陆后八人小队深入敌后救一兵。"},
+  {t:"千与千寻",o:"Spirited Away",y:2001,r:8.6,s:["IMDb","豆瓣"],g:"动画/奇幻",c:"日本",d:"宫崎骏",desc:"少女在神灵世界的成长与救赎之旅。"},
+  {t:"星际穿越",o:"Interstellar",y:2014,r:8.7,s:["IMDb","豆瓣"],g:"科幻/冒险",c:"美国",d:"克里斯托弗·诺兰",desc:"穿越虫洞寻找人类新家园的星际远征。"},
+  {t:"绿里奇迹",o:"The Green Mile",y:1999,r:8.6,s:["IMDb","豆瓣"],g:"剧情/奇幻",c:"美国",d:"弗兰克·德拉邦特",desc:"死囚狱警与拥有神力的黑人囚徒的故事。"},
+  {t:"寄生虫",o:"Parasite",y:2019,r:8.5,s:["IMDb","豆瓣"],g:"剧情/惊悚",c:"韩国",d:"奉俊昊",desc:"贫富两个家庭在豪宅中交织的荒诞悲剧。"},
+  {t:"这个杀手不太冷",o:"Léon: The Professional",y:1994,r:8.5,s:["IMDb","豆瓣"],g:"剧情/动作",c:"法国",d:"吕克·贝松",desc:"孤独杀手与早熟女孩的非寻常羁绊。"},
+  {t:"切腹",o:"Harakiri",y:1962,r:8.6,s:["IMDb","豆瓣"],g:"剧情/动作",c:"日本",d:"小林正树",desc:"浪人借切腹之名揭露武士道虚伪的复仇。"},
+  {t:"非常嫌疑犯",o:"The Usual Suspects",y:1995,r:8.5,s:["IMDb","豆瓣"],g:"犯罪/悬疑",c:"美国",d:"布莱恩·辛格",desc:"一场精心策划的海港爆炸与神秘罪犯凯撒。"},
+  {t:"钢琴家",o:"The Pianist",y:2002,r:8.5,s:["IMDb","豆瓣"],g:"剧情/传记",c:"法国",d:"罗曼·波兰斯基",desc:"犹太钢琴家在纳粹占领下的华沙求生。"},
+  {t:"回到未来",o:"Back to the Future",y:1985,r:8.5,s:["IMDb","豆瓣"],g:"喜剧/科幻",c:"美国",d:"罗伯特·泽米吉斯",desc:"少年与疯狂博士的时空穿越大冒险。"},
+  {t:"狮子王",o:"The Lion King",y:1994,r:8.5,s:["IMDb","豆瓣"],g:"动画/冒险",c:"美国",d:"罗杰·阿勒斯",desc:"小狮子辛巴为父报仇重夺荣耀石的旅程。"},
+  {t:"美国往事",o:"Once Upon a Time in America",y:1984,r:8.3,s:["IMDb","豆瓣"],g:"犯罪/剧情",c:"美国",d:"赛尔乔·莱昂内",desc:"纽约犹太黑帮跨越四十年的恩怨情仇。"},
+  {t:"致命魔术",o:"The Prestige",y:2006,r:8.5,s:["IMDb","豆瓣"],g:"剧情/悬疑",c:"美国",d:"克里斯托弗·诺兰",desc:"两位魔术师以命相搏的嫉妒与执念。"},
+  {t:"楚门的世界",o:"The Truman Show",y:1998,r:8.2,s:["IMDb","豆瓣"],g:"剧情/科幻",c:"美国",d:"彼得·威尔",desc:"发现自己的人生是24小时直播真人秀的男人。"},
+  {t:"三傻大闹宝莱坞",o:"3 Idiots",y:2009,r:8.4,s:["IMDb","豆瓣"],g:"剧情/喜剧",c:"印度",d:"拉吉库马尔·希拉尼",desc:"三个工程学院好友对填鸭式教育的反抗。"},
+  {t:"霸王别姬",o:"Farewell My Concubine",y:1993,r:9.6,s:["豆瓣"],g:"剧情/爱情",c:"中国大陆",d:"陈凯歌",desc:"程蝶衣与段小楼跨越半个世纪的戏梦人生。"},
+  {t:"无间道",o:"Infernal Affairs",y:2002,r:9.3,s:["豆瓣"],g:"剧情/犯罪",c:"香港",d:"刘伟强/麦兆辉",desc:"警方卧底与黑帮卧底的命运镜像。"},
+  {t:"大话西游之大圣娶亲",o:"A Chinese Odyssey Part Two",y:1995,r:9.2,s:["豆瓣"],g:"喜剧/爱情",c:"香港",d:"刘镇伟",desc:"至尊宝戴上金箍就无法爱你，不戴则无法救你。"},
+  {t:"鬼子来了",o:"Devils on the Doorstep",y:2000,r:9.3,s:["豆瓣"],g:"剧情/喜剧",c:"中国大陆",d:"姜文",desc:"农民看管日军俘虏引发的荒诞悲剧。"},
+  {t:"大话西游之月光宝盒",o:"A Chinese Odyssey Part One",y:1995,r:9.0,s:["豆瓣"],g:"喜剧/爱情",c:"香港",d:"刘镇伟",desc:"月光宝盒开启的穿越与宿命。"},
+  {t:"饮食男女",o:"Eat Drink Man Woman",y:1994,r:9.2,s:["豆瓣"],g:"剧情/家庭",c:"台湾",d:"李安",desc:"退休大厨与三个女儿每周日的家庭晚宴。"},
+  {t:"一一",o:"Yi Yi",y:2000,r:9.1,s:["豆瓣"],g:"剧情/家庭",c:"台湾",d:"杨德昌",desc:"一个台北家庭从婚礼到葬礼的生命切片。"},
+  {t:"甜蜜蜜",o:"Comrades: Almost a Love Story",y:1996,r:8.9,s:["豆瓣"],g:"剧情/爱情",c:"香港",d:"陈可辛",desc:"两个大陆移民在香港十年间的聚散离合。"},
+  {t:"重庆森林",o:"Chungking Express",y:1994,r:8.8,s:["豆瓣"],g:"剧情/爱情",c:"香港",d:"王家卫",desc:"两段在速食店发生的都市失恋与邂逅。"},
+  {t:"春光乍泄",o:"Happy Together",y:1997,r:8.8,s:["豆瓣"],g:"剧情/爱情",c:"香港",d:"王家卫",desc:"两个男人在布宜诺斯艾利斯的纠缠与分离。"},
+  {t:"花样年华",o:"In the Mood for Love",y:2000,r:8.8,s:["豆瓣"],g:"剧情/爱情",c:"香港",d:"王家卫",desc:"1962年香港，两对夫妻的错位与暧昧。"},
+  {t:"东邪西毒",o:"Ashes of Time",y:1994,r:8.6,s:["豆瓣"],g:"武侠/爱情",c:"香港",d:"王家卫",desc:"欧阳锋与各路剑客在沙漠客栈的往事追忆。"},
+  {t:"倩女幽魂",o:"A Chinese Ghost Story",y:1987,r:8.8,s:["豆瓣"],g:"爱情/奇幻",c:"香港",d:"程小东",desc:"书生宁采臣与女鬼聂小倩的人鬼恋。"},
+  {t:"英雄本色",o:"A Better Tomorrow",y:1986,r:8.6,s:["豆瓣"],g:"动作/犯罪",c:"香港",d:"吴宇森",desc:"兄弟情义与江湖道义的暴力美学经典。"},
+  {t:"纵横四海",o:"Once a Thief",y:1991,r:8.8,s:["豆瓣"],g:"动作/喜剧",c:"香港",d:"吴宇森",desc:"三个孤儿大盗的友情、爱情与复仇。"},
+  {t:"阿飞正传",o:"Days of Being Wild",y:1990,r:8.5,s:["豆瓣"],g:"剧情/爱情",c:"香港",d:"王家卫",desc:"无脚鸟旭仔的漂泊与自我寻找。"},
+  {t:"牯岭街少年杀人事件",o:"A Brighter Summer Day",y:1991,r:8.9,s:["豆瓣"],g:"剧情/犯罪",c:"台湾",d:"杨德昌",desc:"1961年台北，一个少年在帮派与爱情中的毁灭。"},
+  {t:"阳光灿烂的日子",o:"In the Heat of the Sun",y:1994,r:8.8,s:["豆瓣"],g:"剧情/爱情",c:"中国大陆",d:"姜文",desc:"文革时期北京军区大院少年的青春躁动。"},
+  {t:"活着",o:"To Live",y:1994,r:9.3,s:["豆瓣"],g:"剧情/历史",c:"中国大陆",d:"张艺谋",desc:"福贵一家在大时代中的苦难与坚韧。"},
+  {t:"大闹天宫",o:"Havoc in Heaven",y:1961,r:9.4,s:["豆瓣"],g:"动画/奇幻",c:"中国大陆",d:"万籁鸣",desc:"孙悟空反抗天庭的中国动画巅峰之作。"},
+  {t:"哪吒闹海",o:"Nezha Conquers the Dragon King",y:1979,r:8.9,s:["豆瓣"],g:"动画/奇幻",c:"中国大陆",d:"王树忱",desc:"哪吒自刎救民、莲花重生的经典神话。"},
+  {t:"天书奇谭",o:"The Legend of Sealed Book",y:1983,r:9.2,s:["豆瓣"],g:"动画/奇幻",c:"中国大陆",d:"王树忱",desc:"袁公盗天书、蛋生斩妖除魔的奇诡动画。"},
+  {t:"让子弹飞",o:"Let the Bullets Fly",y:2010,r:8.8,s:["豆瓣"],g:"剧情/喜剧",c:"中国大陆",d:"姜文",desc:"悍匪张麻子冒充县长与恶霸黄四郎的较量。"},
+  {t:"疯狂动物城",o:"Zootopia",y:2016,r:8.7,s:["豆瓣"],g:"动画/喜剧",c:"美国",d:"拜伦·霍华德",desc:"兔子警官与狐狸骗子联手破解动物城阴谋。"},
+  {t:"寻梦环游记",o:"Coco",y:2017,r:8.8,s:["豆瓣"],g:"动画/音乐",c:"美国",d:"李·昂克里奇",desc:"墨西哥男孩在亡灵节穿越生死之界的寻亲之旅。"},
+  {t:"飞屋环游记",o:"Up",y:2009,r:8.7,s:["豆瓣"],g:"动画/冒险",c:"美国",d:"彼特·道格特",desc:"老人用气球屋飞往南美兑现对亡妻的承诺。"},
+  {t:"机器人总动员",o:"WALL·E",y:2008,r:8.7,s:["豆瓣"],g:"动画/科幻",c:"美国",d:"安德鲁·斯坦顿",desc:"孤独清扫机器人与探测机器人伊娃的太空之恋。"},
+  {t:"哈尔的移动城堡",o:"Howl's Moving Castle",y:2004,r:8.6,s:["豆瓣"],g:"动画/奇幻",c:"日本",d:"宫崎骏",desc:"被诅咒的少女与神秘魔法师的移动城堡奇缘。"},
+  {t:"龙猫",o:"My Neighbor Totoro",y:1988,r:8.6,s:["豆瓣"],g:"动画/奇幻",c:"日本",d:"宫崎骏",desc:"两姐妹在乡间与森林精灵龙猫的温馨相遇。"},
+  {t:"天空之城",o:"Castle in the Sky",y:1986,r:8.6,s:["豆瓣"],g:"动画/奇幻",c:"日本",d:"宫崎骏",desc:"少女希达与少年巴鲁寻找浮空岛拉普达的冒险。"},
+  {t:"幽灵公主",o:"Princess Mononoke",y:1997,r:8.5,s:["豆瓣"],g:"动画/奇幻",c:"日本",d:"宫崎骏",desc:"人类工业与森林神灵的史诗级冲突。"},
+  {t:"你的名字",o:"Your Name",y:2016,r:8.5,s:["豆瓣"],g:"动画/爱情",c:"日本",d:"新海诚",desc:"互换身体的少年少女跨越时空寻找彼此。"},
+  {t:"情书",o:"Love Letter",y:1995,r:8.6,s:["豆瓣"],g:"剧情/爱情",c:"日本",d:"岩井俊二",desc:"一封寄往天国的情书揭开尘封的初恋往事。"},
+  {t:"侧耳倾听",o:"Whisper of the Heart",y:1995,r:8.5,s:["豆瓣"],g:"动画/爱情",c:"日本",d:"近藤喜文",desc:"少女在追寻梦想与初恋中的成长故事。"},
+  {t:"萤火虫之墓",o:"Grave of the Fireflies",y:1988,r:8.5,s:["豆瓣"],g:"动画/战争",c:"日本",d:"高畑勋",desc:"二战末期兄妹俩在战火中的悲惨求生。"},
+  {t:"秒速5厘米",o:"5 Centimeters per Second",y:2007,r:8.3,s:["豆瓣"],g:"动画/爱情",c:"日本",d:"新海诚",desc:"三个章节讲述远距离恋爱的消逝与遗憾。"},
+  {t:"攻壳机动队",o:"Ghost in the Shell",y:1995,r:8.4,s:["豆瓣"],g:"动画/科幻",c:"日本",d:"押井守",desc:"赛博朋克经典，义体女警追查AI黑客傀儡师。"},
+  {t:"新世纪福音战士剧场版",o:"The End of Evangelion",y:1997,r:8.4,s:["豆瓣"],g:"动画/科幻",c:"日本",d:"庵野秀明",desc:"人类补完计划的终结与意识流的极致表达。"},
+  {t:"死亡笔记",o:"Death Note",y:2006,r:8.3,s:["豆瓣"],g:"剧情/悬疑",c:"日本",d:"金子修介",desc:"高中生捡到死神笔记，以正义之名行杀戮。"},
+  {t:"奥本海默",o:"Oppenheimer",y:2023,r:8.4,s:["IMDb","豆瓣"],g:"传记/历史",c:"美国",d:"克里斯托弗·诺兰",desc:"原子弹之父的政治审判与内心挣扎。"},
+  {t:"沙丘2",o:"Dune: Part Two",y:2024,r:8.4,s:["IMDb","豆瓣"],g:"科幻/冒险",c:"美国",d:"丹尼斯·维伦纽瓦",desc:"保罗·厄崔迪联合弗雷曼人向哈克南家族复仇。"},
+  {t:"蜘蛛侠：纵横宇宙",o:"Spider-Man: Across the Spider-Verse",y:2023,r:8.5,s:["IMDb","豆瓣"],g:"动画/科幻",c:"美国",d:"乔伊姆·多斯·桑托斯",desc:"迈尔斯穿越多元宇宙与蜘蛛联盟的理念冲突。"},
+  {t:"复仇者联盟4",o:"Avengers: Endgame",y:2019,r:8.4,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"罗素兄弟",desc:"复仇者联盟穿越时间线逆转灭霸的响指。"},
+  {t:"钢铁侠",o:"Iron Man",y:2008,r:7.9,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"乔恩·费儒",desc:"托尼·斯塔克在山洞中打造初代钢铁战甲。"},
+  {t:"美国队长2",o:"Captain America: The Winter Soldier",y:2014,r:7.8,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"罗素兄弟",desc:"美国队长发现神盾局已被九头蛇渗透。"},
+  {t:"黑豹",o:"Black Panther",y:2018,r:7.3,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"瑞恩·库格勒",desc:"瓦坎达王子特查拉继承王位与心魔对抗。"},
+  {t:"雷神3：诸神黄昏",o:"Thor: Ragnarok",y:2017,r:7.9,s:["IMDb","豆瓣"],g:"动作/喜剧",c:"美国",d:"塔伊加·维迪提",desc:"雷神在萨卡星角斗场与浩克重逢。"},
+  {t:"银河护卫队",o:"Guardians of the Galaxy",y:2014,r:8.0,s:["IMDb","豆瓣"],g:"动作/喜剧",c:"美国",d:"詹姆斯·古恩",desc:"一群乌合之众组成宇宙最不靠谱的英雄团队。"},
+  {t:"奇异博士",o:"Doctor Strange",y:2016,r:7.5,s:["IMDb","豆瓣"],g:"动作/奇幻",c:"美国",d:"斯科特·德瑞克森",desc:"外科医生车祸后习得卡玛泰姬的魔法秘术。"},
+  {t:"蚁人",o:"Ant-Man",y:2015,r:7.3,s:["IMDb","豆瓣"],g:"动作/喜剧",c:"美国",d:"佩顿·里德",desc:"小偷穿上蚁人战服执行微观世界潜入任务。"},
+  {t:"死侍",o:"Deadpool",y:2016,r:8.0,s:["IMDb","豆瓣"],g:"喜剧/动作",c:"美国",d:"蒂姆·米勒",desc:"话痨佣兵韦德·威尔逊的复仇与爱情。"},
+  {t:"金刚狼3：殊死一战",o:"Logan",y:2017,r:8.1,s:["IMDb","豆瓣"],g:"剧情/动作",c:"美国",d:"詹姆斯·曼高德",desc:"暮年狼叔与X-23的最后公路之旅。"},
+  {t:"X战警：逆转未来",o:"X-Men: Days of Future Past",y:2014,r:8.0,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"布莱恩·辛格",desc:"金刚狼穿越回1973年阻止哨兵计划。"},
+  {t:"蝙蝠侠大战超人",o:"Batman v Superman",y:2016,r:6.5,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"扎克·施奈德",desc:"蝙蝠侠与超人的理念冲突与毁灭日危机。"},
+  {t:"正义联盟",o:"Justice League",y:2017,r:6.1,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"扎克·施奈德",desc:"蝙蝠侠与神奇女侠召集超英对抗荒原狼。"},
+  {t:"海王",o:"Aquaman",y:2018,r:6.9,s:["IMDb","豆瓣"],g:"动作/奇幻",c:"美国",d:"温子仁",desc:"半人半亚特兰蒂斯的亚瑟争夺海底王位。"},
+  {t:"小丑",o:"Joker",y:2019,r:8.4,s:["IMDb","豆瓣"],g:"剧情/犯罪",c:"美国",d:"托德·菲利普斯",desc:"社会边缘人亚瑟·弗莱克蜕变为哥谭小丑。"},
+  {t:"新蝙蝠侠",o:"The Batman",y:2022,r:7.8,s:["IMDb","豆瓣"],g:"动作/悬疑",c:"美国",d:"马特·里夫斯",desc:"布鲁斯·韦恩第二年打击犯罪遭遇谜语人。"},
+  {t:"壮志凌云2",o:"Top Gun: Maverick",y:2022,r:8.3,s:["IMDb","豆瓣"],g:"动作/剧情",c:"美国",d:"约瑟夫·科辛斯基",desc:"老飞行员训练新生代执行高难度轰炸任务。"},
+  {t:"碟中谍6",o:"Mission: Impossible - Fallout",y:2018,r:7.7,s:["IMDb","豆瓣"],g:"动作/冒险",c:"美国",d:"克里斯托夫·迈考利",desc:"伊森·亨特追踪钚核与昔日战友的背叛。"},
+  {t:"007：大战皇家赌场",o:"Casino Royale",y:2006,r:8.0,s:["IMDb","豆瓣"],g:"动作/惊悚",c:"英国",d:"马丁·坎贝尔",desc:"邦德初出茅庐，在牌桌上对抗恐怖分子。"},
+  {t:"速度与激情5",o:"Fast Five",y:2011,r:7.3,s:["IMDb","豆瓣"],g:"动作/犯罪",c:"美国",d:"林诣彬",desc:"多米尼克团队在里约抢劫毒枭一亿现金。"},
+  {t:"变形金刚",o:"Transformers",y:2007,r:7.0,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"迈克尔·贝",desc:"汽车人与霸天虎在地球的终极对决。"},
+  {t:"侏罗纪公园",o:"Jurassic Park",y:1993,r:8.2,s:["IMDb","豆瓣"],g:"科幻/冒险",c:"美国",d:"史蒂文·斯皮尔伯格",desc:"科学家复活恐龙，主题公园变成死亡陷阱。"},
+  {t:"大白鲨",o:"Jaws",y:1975,r:8.1,s:["IMDb","豆瓣"],g:"惊悚/冒险",c:"美国",d:"史蒂文·斯皮尔伯格",desc:"小镇警长与海洋学家联手猎杀食人鲨。"},
+  {t:"E.T.外星人",o:"E.T. the Extra-Terrestrial",y:1982,r:7.9,s:["IMDb","豆瓣"],g:"科幻/家庭",c:"美国",d:"史蒂文·斯皮尔伯格",desc:"男孩艾里奥特与迷路外星人的跨物种友谊。"},
+  {t:"异形",o:"Alien",y:1979,r:8.5,s:["IMDb","豆瓣"],g:"科幻/恐怖",c:"美国",d:"雷德利·斯科特",desc:"太空船员在货船中遭遇完美生物异形。"},
+  {t:"银翼杀手",o:"Blade Runner",y:1982,r:8.1,s:["IMDb","豆瓣"],g:"科幻/惊悚",c:"美国",d:"雷德利·斯科特",desc:"2019年洛杉矶，复制人猎手对仿生人的追杀。"},
+  {t:"终结者2",o:"Terminator 2: Judgment Day",y:1991,r:8.6,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"詹姆斯·卡梅隆",desc:"T-800保护少年约翰对抗液态金属T-1000。"},
+  {t:"机械姬",o:"Ex Machina",y:2014,r:7.7,s:["IMDb","豆瓣"],g:"科幻/悬疑",c:"英国",d:"亚历克斯·加兰",desc:"程序员参与人工智能图灵测试的致命实验。"},
+  {t:"她",o:"Her",y:2013,r:8.0,s:["IMDb","豆瓣"],g:"剧情/爱情",c:"美国",d:"斯派克·琼斯",desc:"孤独男子与人工智能操作系统坠入爱河。"},
+  {t:"月球",o:"Moon",y:2009,r:7.8,s:["IMDb","豆瓣"],g:"科幻/悬疑",c:"英国",d:"邓肯·琼斯",desc:"月球基地矿工在三年任期结束前发现惊人真相。"},
+  {t:"地心引力",o:"Gravity",y:2013,r:7.7,s:["IMDb","豆瓣"],g:"科幻/惊悚",c:"美国",d:"阿方索·卡隆",desc:"宇航员在太空碎片袭击后绝境求生。"},
+  {t:"火星救援",o:"The Martian",y:2015,r:8.0,s:["IMDb","豆瓣"],g:"科幻/冒险",c:"美国",d:"雷德利·斯科特",desc:"宇航员马克被困火星，用科学知识种土豆求生。"},
+  {t:"降临",o:"Arrival",y:2016,r:7.9,s:["IMDb","豆瓣"],g:"剧情/科幻",c:"美国",d:"丹尼斯·维伦纽瓦",desc:"语言学家破译外星人语言，预见未来时间线。"},
+  {t:"头号玩家",o:"Ready Player One",y:2018,r:7.6,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"史蒂文·斯皮尔伯格",desc:"穷少年在虚拟世界绿洲中寻找创始人彩蛋。"},
+  {t:"无敌破坏王",o:"Wreck-It Ralph",y:2012,r:7.7,s:["IMDb","豆瓣"],g:"动画/喜剧",c:"美国",d:"瑞奇·摩尔",desc:"游戏反派渴望成为英雄，穿越街机世界。"},
+  {t:"疯狂原始人",o:"The Croods",y:2013,r:7.2,s:["IMDb","豆瓣"],g:"动画/喜剧",c:"美国",d:"柯克·德·米科",desc:"原始人家庭在末日中探索新世界的旅程。"},
+  {t:"功夫熊猫",o:"Kung Fu Panda",y:2008,r:7.6,s:["IMDb","豆瓣"],g:"动画/喜剧",c:"美国",d:"马克·奥斯本",desc:"胖熊猫阿宝意外成为神龙大侠的励志故事。"},
+  {t:"驯龙高手",o:"How to Train Your Dragon",y:2010,r:8.1,s:["IMDb","豆瓣"],g:"动画/奇幻",c:"美国",d:"迪恩·德布洛斯",desc:"维京少年与夜煞龙无牙成为挚友。"},
+  {t:"冰雪奇缘",o:"Frozen",y:2013,r:7.4,s:["IMDb","豆瓣"],g:"动画/歌舞",c:"美国",d:"克里斯·巴克",desc:"艾莎女王逃离王国，安娜踏上寻姐之旅。"},
+  {t:"超能陆战队",o:"Big Hero 6",y:2014,r:7.8,s:["IMDb","豆瓣"],g:"动画/科幻",c:"美国",d:"唐·霍尔",desc:"少年与医疗机器人大白组建超级英雄团队。"},
+  {t:"头脑特工队",o:"Inside Out",y:2015,r:8.1,s:["IMDb","豆瓣"],g:"动画/喜剧",c:"美国",d:"彼特·道格特",desc:"五种情绪小人操控小女孩的内心世界。"},
+  {t:"玩具总动员",o:"Toy Story",y:1995,r:8.3,s:["IMDb","豆瓣"],g:"动画/家庭",c:"美国",d:"约翰·拉塞特",desc:"牛仔警长胡迪与太空骑警巴斯光年的友谊。"},
+  {t:"海底总动员",o:"Finding Nemo",y:2003,r:8.2,s:["IMDb","豆瓣"],g:"动画/冒险",c:"美国",d:"安德鲁·斯坦顿",desc:"小丑鱼父亲横跨大洋寻找被掳走的儿子。"},
+  {t:"怪兽电力公司",o:"Monsters, Inc.",y:2001,r:8.1,s:["IMDb","豆瓣"],g:"动画/喜剧",c:"美国",d:"彼特·道格特",desc:"怪兽世界靠吓唬小孩发电，直到遇见不害怕的女孩。"},
+  {t:"美食总动员",o:"Ratatouille",y:2007,r:8.1,s:["IMDb","豆瓣"],g:"动画/喜剧",c:"美国",d:"布拉德·伯德",desc:"梦想成为大厨的老鼠控制人类学徒做菜。"},
+  {t:"赛车总动员",o:"Cars",y:2006,r:7.2,s:["IMDb","豆瓣"],g:"动画/运动",c:"美国",d:"约翰·拉塞特",desc:"骄傲赛车闪电麦昆在小镇学会谦逊与友谊。"},
+  {t:"超人总动员",o:"The Incredibles",y:2004,r:8.0,s:["IMDb","豆瓣"],g:"动画/动作",c:"美国",d:"布拉德·伯德",desc:"超人一家隐姓埋名多年后重出江湖。"},
+  {t:"勇敢传说",o:"Brave",y:2012,r:7.1,s:["IMDb","豆瓣"],g:"动画/奇幻",c:"美国",d:"马克·安德鲁斯",desc:"苏格兰公主梅莉达用箭术改变命运诅咒。"},
+  {t:"头脑特工队2",o:"Inside Out 2",y:2024,r:7.6,s:["IMDb","豆瓣"],g:"动画/喜剧",c:"美国",d:"凯尔西·曼",desc:"青春期来临，焦虑等新情绪加入大脑总部。"},
+  {t:"死侍与金刚狼",o:"Deadpool & Wolverine",y:2024,r:7.6,s:["IMDb","豆瓣"],g:"喜剧/动作",c:"美国",d:"肖恩·利维",desc:"死侍招募金刚狼拯救时间线崩塌的多元宇宙。"},
+  {t:"毒液：最后一舞",o:"Venom: The Last Dance",y:2024,r:6.5,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"凯莉·马塞尔",desc:"埃迪与毒液在逃亡中面对共生体之神纳尔。"},
+  {t:"小丑2",o:"Joker: Folie à Deux",y:2024,r:5.8,s:["IMDb","豆瓣"],g:"剧情/歌舞",c:"美国",d:"托德·菲利普斯",desc:"亚瑟在阿卡姆疯人院与哈莉·奎茵的致命共舞。"},
+  {t:"海王2",o:"Aquaman and the Lost Kingdom",y:2023,r:5.6,s:["IMDb","豆瓣"],g:"动作/奇幻",c:"美国",d:"温子仁",desc:"海王联合奥姆对抗黑三叉戟的远古诅咒。"},
+  {t:"闪电侠",o:"The Flash",y:2023,r:6.7,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"安德斯·穆斯切蒂",desc:"巴里穿越时间救母，引发多元宇宙崩塌。"},
+  {t:"哥斯拉大战金刚2",o:"Godzilla x Kong",y:2024,r:6.2,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"亚当·温加德",desc:"哥斯拉与金刚联手对抗地心世界新威胁。"},
+  {t:"金刚大战哥斯拉",o:"Godzilla vs. Kong",y:2021,r:6.3,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"亚当·温加德",desc:"两大泰坦巨兽在香港的终极对决。"},
+  {t:"环太平洋",o:"Pacific Rim",y:2013,r:6.9,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"吉尔莫·德尔·托罗",desc:"人类驾驶巨型机甲对抗海底怪兽入侵。"},
+  {t:"大黄蜂",o:"Bumblebee",y:2018,r:6.7,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"特拉维斯·奈特",desc:"少女查理与受伤大黄蜂在1987年的友谊。"},
+  {t:"蜘蛛侠2",o:"Spider-Man 2",y:2004,r:7.5,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"山姆·雷米",desc:"彼得在责任与爱情间挣扎，对抗章鱼博士。"},
+  {t:"蜘蛛侠3",o:"Spider-Man 3",y:2007,r:6.3,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"山姆·雷米",desc:"彼得被外星共生体侵蚀，面对三个反派。"},
+  {t:"蜘蛛侠：英雄归来",o:"Spider-Man: Homecoming",y:2017,r:7.4,s:["IMDb","豆瓣"],g:"动作/喜剧",c:"美国",d:"乔恩·沃茨",desc:"彼得·帕克在高中生与蜘蛛侠身份间的平衡。"},
+  {t:"蜘蛛侠：英雄远征",o:"Spider-Man: Far From Home",y:2019,r:7.4,s:["IMDb","豆瓣"],g:"动作/喜剧",c:"美国",d:"乔恩·沃茨",desc:"欧洲修学旅行中遭遇元素众与神秘客。"},
+  {t:"蜘蛛侠：英雄无归",o:"Spider-Man: No Way Home",y:2021,r:8.2,s:["IMDb","豆瓣"],g:"动作/奇幻",c:"美国",d:"乔恩·沃茨",desc:"三代蜘蛛侠同框，多元宇宙反派齐聚。"},
+  {t:"毒液",o:"Venom",y:2018,r:6.6,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"鲁本·弗雷斯彻",desc:"记者埃迪与外星共生体毒液的共生关系。"},
+  {t:"毒液2",o:"Venom: Let There Be Carnage",y:2021,r:5.9,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"安迪·瑟金斯",desc:"毒液与埃迪对抗红色共生体屠杀。"},
+  {t:"X战警",o:"X-Men",y:2000,r:7.3,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"布莱恩·辛格",desc:"变种人学校与万磁王兄弟会的首次交锋。"},
+  {t:"X战警2",o:"X2: X-Men United",y:2003,r:7.4,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"布莱恩·辛格",desc:"X战警联手万磁王对抗反变种人极端分子。"},
+  {t:"X战警3",o:"X-Men: The Last Stand",y:2006,r:6.7,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"布莱特·拉特纳",desc:"人类研发出变种人解药，凤凰女黑化。"},
+  {t:"X战警：第一战",o:"X-Men: First Class",y:2011,r:7.7,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"马修·沃恩",desc:"X教授与万磁王在古巴导弹危机中的起源。"},
+  {t:"X战警：天启",o:"X-Men: Apocalypse",y:2016,r:6.9,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"布莱恩·辛格",desc:"史上第一个变种人天启苏醒，企图毁灭世界。"},
+  {t:"金刚狼",o:"X-Men Origins: Wolverine",y:2009,r:6.5,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"加文·胡德",desc:"金刚狼的起源与兄弟剑齿虎的恩怨。"},
+  {t:"金刚狼2",o:"The Wolverine",y:2013,r:6.7,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"詹姆斯·曼高德",desc:"罗根在日本保护恩人之女，面对银武士。"},
+  {t:"奇异博士2",o:"Doctor Strange in the Multiverse of Madness",y:2022,r:6.9,s:["IMDb","豆瓣"],g:"动作/奇幻",c:"美国",d:"山姆·雷米",desc:"奇异博士穿越多元宇宙对抗黑化绯红女巫。"},
+  {t:"雷神",o:"Thor",y:2011,r:7.0,s:["IMDb","豆瓣"],g:"动作/奇幻",c:"美国",d:"肯尼思·布拉纳",desc:"雷神索尔被贬人间，学会谦逊与牺牲。"},
+  {t:"雷神2",o:"Thor: The Dark World",y:2013,r:6.8,s:["IMDb","豆瓣"],g:"动作/奇幻",c:"美国",d:"艾伦·泰勒",desc:"雷神与洛基联手对抗黑暗精灵玛勒基斯。"},
+  {t:"雷神4",o:"Thor: Love and Thunder",y:2022,r:6.2,s:["IMDb","豆瓣"],g:"喜剧/动作",c:"美国",d:"塔伊加·维迪提",desc:"雷神减肥成功，与女雷神对抗屠神者格尔。"},
+  {t:"美国队长3",o:"Captain America: Civil War",y:2016,r:7.8,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"罗素兄弟",desc:"复仇者联盟因索科维亚协议分裂为两派。"},
+  {t:"复仇者联盟",o:"The Avengers",y:2012,r:8.0,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"乔斯·韦登",desc:"六位超级英雄首次集结对抗洛基与齐塔瑞大军。"},
+  {t:"复仇者联盟2",o:"Avengers: Age of Ultron",y:2015,r:7.3,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"乔斯·韦登",desc:"托尼创造的人工智能奥创企图毁灭人类。"},
+  {t:"复仇者联盟3",o:"Avengers: Infinity War",y:2018,r:8.4,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"罗素兄弟",desc:"灭霸集齐无限宝石，宇宙一半生命灰飞烟灭。"},
+  {t:"蚁人2",o:"Ant-Man and the Wasp",y:2018,r:7.0,s:["IMDb","豆瓣"],g:"喜剧/动作",c:"美国",d:"佩顿·里德",desc:"蚁人与黄蜂女联手营救被困量子领域的珍妮特。"},
+  {t:"惊奇队长",o:"Captain Marvel",y:2019,r:6.8,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"安娜·波顿",desc:"卡罗尔·丹弗斯找回记忆，成为宇宙最强英雄。"},
+  {t:"惊奇队长2",o:"The Marvels",y:2023,r:5.6,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"尼娅·达科斯塔",desc:"三位女英雄因量子纠缠联手对抗克里帝国。"},
+  {t:"尚气",o:"Shang-Chi and the Legend of the Ten Rings",y:2021,r:7.4,s:["IMDb","豆瓣"],g:"动作/奇幻",c:"美国",d:"德斯汀·克里顿",desc:"尚气面对父亲十环帮首领文武的宿命。"},
+  {t:"永恒族",o:"Eternals",y:2021,r:6.3,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"赵婷",desc:"永恒族在地球上秘密守护人类七千年。"},
+  {t:"银河护卫队2",o:"Guardians of the Galaxy Vol. 2",y:2017,r:7.6,s:["IMDb","豆瓣"],g:"喜剧/动作",c:"美国",d:"詹姆斯·古恩",desc:"星爵寻找生父，揭开天神族伊戈的阴谋。"},
+  {t:"银河护卫队3",o:"Guardians of the Galaxy Vol. 3",y:2023,r:7.9,s:["IMDb","豆瓣"],g:"喜剧/动作",c:"美国",d:"詹姆斯·古恩",desc:"火箭浣熊的悲惨过去与团队的最终冒险。"},
+  {t:"无敌浩克",o:"The Incredible Hulk",y:2008,r:6.6,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"路易斯·莱特里尔",desc:"班纳躲避军方追捕，对抗憎恶。"},
+  {t:"黑寡妇",o:"Black Widow",y:2021,r:6.7,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"凯特·绍特兰",desc:"娜塔莎回到俄罗斯面对红房组织的过去。"},
+  {t:"黑豹2",o:"Black Panther: Wakanda Forever",y:2022,r:6.7,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"瑞恩·库格勒",desc:"瓦坎达在失去特查拉后对抗海底王国塔洛坎。"},
+  {t:"蚁人3",o:"Ant-Man and the Wasp: Quantumania",y:2023,r:6.1,s:["IMDb","豆瓣"],g:"喜剧/动作",c:"美国",d:"佩顿·里德",desc:"蚁人家族误入量子领域，面对征服者康。"},
+  {t:"美国队长4",o:"Captain America: Brave New World",y:2025,r:6.0,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"朱利叶斯·约拿",desc:"山姆·威尔逊正式接任美国队长，卷入国际阴谋。"},
+  {t:"雷霆特攻队",o:"Thunderbolts*",y:2025,r:6.7,s:["IMDb","豆瓣"],g:"动作/冒险",c:"美国",d:"杰克·施莱尔",desc:"一群反英雄被迫联手执行政府黑色任务。"},
+  {t:"神奇四侠",o:"The Fantastic Four: First Steps",y:2025,r:6.0,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"马特·沙克曼",desc:"神奇四侠在复古未来主义纽约对抗行星吞噬者。"},
+  {t:"超人",o:"Superman",y:2025,r:6.5,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"詹姆斯·古恩",desc:"DC宇宙重启，超人平衡氪星遗产与地球身份。"},
+  {t:"泰坦尼克号",o:"Titanic",y:1997,r:7.9,s:["IMDb","豆瓣"],g:"剧情/爱情",c:"美国",d:"詹姆斯·卡梅隆",desc:"穷画家与贵族少女在沉船前的旷世之恋。"},
+  {t:"阿凡达",o:"Avatar",y:2009,r:7.9,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"詹姆斯·卡梅隆",desc:"残疾士兵化身阿凡达在潘多拉星球的觉醒。"},
+  {t:"阿凡达2",o:"Avatar: The Way of Water",y:2022,r:7.6,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"詹姆斯·卡梅隆",desc:"杰克一家在潘多拉海洋部落中的生存之战。"},
+  {t:"盗火线",o:"Heat",y:1995,r:8.3,s:["IMDb","豆瓣"],g:"剧情/犯罪",c:"美国",d:"迈克尔·曼",desc:"警匪双雄在洛杉矶街头的宿命对决。"},
+  {t:"勇敢的心",o:"Braveheart",y:1995,r:8.3,s:["IMDb","豆瓣"],g:"传记/战争",c:"美国",d:"梅尔·吉布森",desc:"苏格兰民族英雄威廉·华莱士的自由之战。"},
+  {t:"角斗士",o:"Gladiator",y:2000,r:8.5,s:["IMDb","豆瓣"],g:"动作/冒险",c:"美国",d:"雷德利·斯科特",desc:"罗马将军沦为角斗士后的复仇与荣耀。"},
+  {t:"末代皇帝",o:"The Last Emperor",y:1987,r:7.7,s:["IMDb","豆瓣"],g:"传记/历史",c:"英国",d:"贝纳尔多·贝托鲁奇",desc:"溥仪从皇帝到平民的跌宕一生。"},
+  {t:"音乐之声",o:"The Sound of Music",y:1965,r:8.1,s:["IMDb","豆瓣"],g:"歌舞/传记",c:"美国",d:"罗伯特·怀斯",desc:"修女玛丽亚与冯·特拉普上校的音乐爱情。"},
+  {t:"卡萨布兰卡",o:"Casablanca",y:1942,r:8.5,s:["IMDb","豆瓣"],g:"剧情/爱情",c:"美国",d:"迈克尔·柯蒂斯",desc:"二战背景下酒吧老板里克与旧爱的重逢与牺牲。"},
+  {t:"乱世佳人",o:"Gone with the Wind",y:1939,r:8.2,s:["IMDb","豆瓣"],g:"剧情/爱情",c:"美国",d:"维克多·弗莱明",desc:"南北战争时期斯嘉丽的爱情与生存史诗。"},
+  {t:"罗马假日",o:"Roman Holiday",y:1953,r:8.1,s:["IMDb","豆瓣"],g:"喜剧/爱情",c:"美国",d:"威廉·惠勒",desc:"公主安妮与记者乔在罗马的24小时浪漫逃亡。"},
+  {t:"魂断蓝桥",o:"Waterloo Bridge",y:1940,r:8.0,s:["豆瓣"],g:"剧情/爱情",c:"美国",d:"茂文·勒鲁瓦",desc:"一战期间芭蕾舞女与军官的悲剧爱情。"},
+  {t:"后窗",o:"Rear Window",y:1954,r:8.5,s:["IMDb","豆瓣"],g:"悬疑/惊悚",c:"美国",d:"阿尔弗雷德·希区柯克",desc:"摔断腿的摄影师透过窗户窥见一起谋杀案。"},
+  {t:"惊魂记",o:"Psycho",y:1960,r:8.5,s:["IMDb","豆瓣"],g:"悬疑/恐怖",c:"美国",d:"阿尔弗雷德·希区柯克",desc:"汽车旅馆里的浴室惊魂与精神分裂。"},
+  {t:"西北偏北",o:"North by Northwest",y:1959,r:8.3,s:["IMDb","豆瓣"],g:"悬疑/惊悚",c:"美国",d:"阿尔弗雷德·希区柯克",desc:"被误认为间谍的广告商在总统山前的逃亡。"},
+  {t:"迷魂记",o:"Vertigo",y:1958,r:8.3,s:["IMDb","豆瓣"],g:"悬疑/爱情",c:"美国",d:"阿尔弗雷德·希区柯克",desc:"侦探对神秘女子的迷恋与身份谜团。"},
+  {t:"出租车司机",o:"Taxi Driver",y:1976,r:8.2,s:["IMDb","豆瓣"],g:"剧情/犯罪",c:"美国",d:"马丁·斯科塞斯",desc:"越战退伍兵在纽约街头的孤独与暴力爆发。"},
+  {t:"愤怒的公牛",o:"Raging Bull",y:1980,r:8.1,s:["IMDb","豆瓣"],g:"传记/剧情",c:"美国",d:"马丁·斯科塞斯",desc:"拳王拉莫塔的暴力人生与自我毁灭。"},
+  {t:"华尔街之狼",o:"The Wolf of Wall Street",y:2013,r:8.2,s:["IMDb","豆瓣"],g:"传记/喜剧",c:"美国",d:"马丁·斯科塞斯",desc:"股票经纪人乔丹·贝尔福特的疯狂敛财史。"},
+  {t:"禁闭岛",o:"Shutter Island",y:2010,r:8.2,s:["IMDb","豆瓣"],g:"悬疑/惊悚",c:"美国",d:"马丁·斯科塞斯",desc:"联邦警探调查精神病院失踪案，真相令人窒息。"},
+  {t:"爱尔兰人",o:"The Irishman",y:2019,r:7.8,s:["IMDb","豆瓣"],g:"传记/犯罪",c:"美国",d:"马丁·斯科塞斯",desc:"黑帮杀手弗兰克·希兰跨越数十年的犯罪人生。"},
+  {t:"敦刻尔克",o:"Dunkirk",y:2017,r:7.8,s:["IMDb","豆瓣"],g:"剧情/战争",c:"英国",d:"克里斯托弗·诺兰",desc:"二战敦刻尔克大撤退的海陆空三线叙事。"},
+  {t:"信条",o:"Tenet",y:2020,r:7.3,s:["IMDb","豆瓣"],g:"动作/科幻",c:"美国",d:"克里斯托弗·诺兰",desc:"特工通过时间逆转阻止未来世界大战。"},
+  {t:"记忆碎片",o:"Memento",y:2000,r:8.4,s:["IMDb","豆瓣"],g:"悬疑/惊悚",c:"美国",d:"克里斯托弗·诺兰",desc:"失忆症患者通过纹身和拍立得寻找杀妻凶手。"},
+  {t:"追随",o:"Following",y:1998,r:7.5,s:["IMDb","豆瓣"],g:"悬疑/犯罪",c:"英国",d:"克里斯托弗·诺兰",desc:"失业作家跟踪陌生人，卷入入室盗窃团伙。"},
+  {t:"失眠症",o:"Insomnia",y:2002,r:7.2,s:["IMDb","豆瓣"],g:"悬疑/惊悚",c:"美国",d:"克里斯托弗·诺兰",desc:"极昼小镇上警探与凶手的心理博弈。"},
+  {t:"蝙蝠侠：侠影之谜",o:"Batman Begins",y:2005,r:8.2,s:["IMDb","豆瓣"],g:"动作/冒险",c:"美国",d:"克里斯托弗·诺兰",desc:"布鲁斯·韦恩从恐惧中诞生蝙蝠侠的起源故事。"},
+  {t:"蝙蝠侠：黑暗骑士崛起",o:"The Dark Knight Rises",y:2012,r:8.4,s:["IMDb","豆瓣"],g:"动作/冒险",c:"美国",d:"克里斯托弗·诺兰",desc:"贝恩摧毁哥谭，蝙蝠侠从地牢中涅槃重生。"},
+  {t:"沙丘",o:"Dune",y:2021,r:8.0,s:["IMDb","豆瓣"],g:"科幻/冒险",c:"美国",d:"丹尼斯·维伦纽瓦",desc:"保罗·厄崔迪在沙漠星球厄拉科斯的命运觉醒。"},
+  {t:"银翼杀手2049",o:"Blade Runner 2049",y:2017,r:8.0,s:["IMDb","豆瓣"],g:"科幻/惊悚",c:"美国",d:"丹尼斯·维伦纽瓦",desc:"复制人K追查第一代银翼杀手的下落。"},
+  {t:"焦土之城",o:"Incendies",y:2010,r:8.3,s:["IMDb","豆瓣"],g:"剧情/悬疑",c:"加拿大",d:"丹尼斯·维伦纽瓦",desc:"双胞胎姐弟根据母亲遗嘱前往中东寻找父亲。"},
+  {t:"囚徒",o:"Prisoners",y:2013,r:8.1,s:["IMDb","豆瓣"],g:"悬疑/惊悚",c:"美国",d:"丹尼斯·维伦纽瓦",desc:"女儿失踪后父亲私自拷问嫌疑人的道德困境。"},
+  {t:"边境杀手",o:"Sicario",y:2015,r:7.7,s:["IMDb","豆瓣"],g:"动作/犯罪",c:"美国",d:"丹尼斯·维伦纽瓦",desc:"FBI探员卷入美墨边境毒品战争的灰色地带。"},
+  {t:"宿敌",o:"Enemy",y:2013,r:6.9,s:["IMDb","豆瓣"],g:"悬疑/惊悚",c:"加拿大",d:"丹尼斯·维伦纽瓦",desc:"大学教授发现与自己长得一模一样的演员。"}
+];
+
+let currentFilter = 'all';
+let history = [];
+let isSpinning = false;
+
+function getFilteredMovies() {
+  if (currentFilter === 'all') return movies;
+  if (currentFilter === 'both') return movies.filter(m => m.s.length > 1);
+  return movies.filter(m => m.s.includes(currentFilter));
+}
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  updateStats();
+}
+
+function updateStats() {
+  const filtered = getFilteredMovies();
+  document.getElementById('totalCount').textContent = filtered.length;
+  document.getElementById('imdbCount').textContent = movies.filter(m => m.s.includes('IMDb')).length;
+  document.getElementById('doubanCount').textContent = movies.filter(m => m.s.includes('豆瓣')).length;
+  document.getElementById('bothCount').textContent = movies.filter(m => m.s.length > 1).length;
+}
+
+function getSourceClass(sources) {
+  if (sources.length > 1) return 'source-both';
+  return sources[0] === 'IMDb' ? 'source-imdb' : 'source-douban';
+}
+
+function getSourceLabel(sources) {
+  if (sources.length > 1) return 'IMDb × 豆瓣';
+  return sources[0];
+}
+
+function renderMovie(m) {
+  return '<div style="animation:fadeIn .5s ease">' +
+    '<div class="movie-title">' + m.t + '</div>' +
+    '<div class="movie-original">' + m.o + '</div>' +
+    '<div class="movie-meta">' +
+      '<span class="meta-tag">' + m.y + '</span>' +
+      '<span class="meta-tag ' + getSourceClass(m.s) + '">' + getSourceLabel(m.s) + '</span>' +
+      '<span class="meta-tag">' + m.c + '</span>' +
+    '</div>' +
+    '<div class="genre-cloud">' + m.g.split('/').map(g => '<span class="genre-tag">' + g + '</span>').join('') + '</div>' +
+    '<div class="rating">★ ' + m.r + '</div>' +
+    '<div class="movie-desc">' + m.desc + '</div>' +
+    '<div class="director">导演：' + m.d + '</div>' +
+  '</div>';
+}
+
+function drawMovie() {
+  if (isSpinning) return;
+  const pool = getFilteredMovies();
+  if (pool.length === 0) return;
+  isSpinning = true;
+  const btn = document.getElementById('drawBtn');
+  btn.disabled = true;
+  btn.textContent = '🎰 抽取中...';
+  const display = document.getElementById('display');
+  let count = 0;
+  const maxSpins = 15;
+  const interval = setInterval(() => {
+    const random = pool[Math.floor(Math.random() * pool.length)];
+    display.innerHTML = renderMovie(random);
+    count++;
+    if (count >= maxSpins) {
+      clearInterval(interval);
+      const final = pool[Math.floor(Math.random() * pool.length)];
+      display.innerHTML = renderMovie(final);
+      addToHistory(final);
+      isSpinning = false;
+      btn.disabled = false;
+      btn.textContent = '🎲 再抽一部';
+    }
+  }, 80);
+}
+
+function addToHistory(m) {
+  history.unshift(m);
+  if (history.length > 10) history.pop();
+  renderHistory();
+}
+
+function renderHistory() {
+  const card = document.getElementById('historyCard');
+  const list = document.getElementById('historyList');
+  if (history.length === 0) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  list.innerHTML = history.map(m =>
+    '<div class="history-item" onclick="showMovieByTitle('' + m.t.replace(/'/g, "\'") + '')">' +
+      '<div class="history-item-title">' + m.t + '</div>' +
+      '<div class="history-item-year">' + m.y + ' · ★' + m.r + '</div>' +
+    '</div>'
+  ).join('');
+}
+
+function showMovieByTitle(title) {
+  const m = movies.find(x => x.t === title);
+  if (m) document.getElementById('display').innerHTML = renderMovie(m);
+}
+
+function showAllMovies() {
+  const pool = getFilteredMovies();
+  const list = pool.map((m, i) => (i+1) + '. ' + m.t + ' (' + m.y + ') ★' + m.r + ' [' + m.s.join('+') + ']').join('
+');
+  alert('当前筛选：' + (currentFilter === 'all' ? '全部' : currentFilter) + '
+共 ' + pool.length + ' 部影片
+
+' + list.substring(0, 2000) + (list.length > 2000 ? '...' : ''));
+}
+
+updateStats();
+</script>
+</body>
+</html>
